@@ -1,40 +1,34 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using RoomRentalSystem.Application.DTOs;
-using RoomRentalSystem.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using RoomRentalSystem.Application.Services.Interfaces;
+using System.Security.Claims;
 
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController(IUserService userService) : ControllerBase
 {
-    private readonly IUserService _userService = userService;
-
     [HttpGet]
     public async Task<IActionResult> GetAllUsers()
     {
-        var users = await _userService.GetAllUsersAsync();
+        var users = await userService.GetAllUsersAsync();
+
         return Ok(users);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUserById(Guid id)
     {
-        var user = await _userService.GetUserByIdAsync(id);
-
-        if (user == null)
-        {
-            return NotFound();
-        }
+        var user = await userService.GetUserByIdAsync(id);
 
         return Ok(user);
     }
-
-    /**
-    [HttpPost]
-    public async Task<IActionResult> CreateUser([FromBody] UserDto userDto)
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetCurrentUser()
     {
-        var result = await _userService.CreateUserAsync(userDto);
-        if (!result.IsSuccess) return BadRequest(result.Message);
-        return CreatedAtAction(nameof(GetUserById), new { id = result.Data.Id }, result.Data);
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        var user = await userService.GetUserByIdAsync(Guid.Parse(userId));
+        return Ok(user);
     }
-    **/
 }

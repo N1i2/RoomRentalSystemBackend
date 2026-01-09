@@ -1,84 +1,58 @@
-﻿using RoomRentalSystem.Application.DTOs;
-using RoomRentalSystem.Application.Interfaces;
+﻿using Mapster;
+using RoomRentalSystem.Application.DTOs;
+using RoomRentalSystem.Application.Services.Interfaces;
 using RoomRentalSystem.Domain.Entities;
+using RoomRentalSystem.Domain.IRepositories;
+using System.Security.Claims;
 using ApplicationException = RoomRentalSystem.Application.Exceptions.ApplicationException;
 
-namespace RoomRentalSystem.Application.Services
+namespace RoomRentalSystem.Application.Services;
+
+public class UserService(
+    IUserRepository userRepository,
+    IRoleRepository roleRepository,
+    IPasswordHasher passwordHasher,
+    IAuthService jwtService) : IUserService
 {
-    public class UserService(IUserRepository userRepository, IRoleRepository roleRepository) : IUserService
+    public async Task<UserDto> GetUserByIdAsync(Guid id)
     {
-        private readonly IUserRepository _userRepository = userRepository;
-        private readonly IRoleRepository _roleRepository = roleRepository;
+        var user = await userRepository.GetByIdAsync(id);
+        return user.Adapt<UserDto>();
+    }
 
-        public async Task<UserDto> GetUserByIdAsync(Guid id)
+    public async Task<List<UserDto>> GetAllUsersAsync()
+    {
+        var users = await userRepository.GetAllAsync();
+        return users.Adapt<List<UserDto>>();
+    }
+
+    public async Task<UserDto> CreateUserAsync(CreateUserDto userDto)
+    {
+        if (await userRepository.ExistsByEmailAsync(userDto.Email))
         {
-            var user = await _userRepository.GetByIdAsync(id);
+            throw new ApplicationException("User with this email already exists");
+        }
 
-            if (user == null)
+        var guestRole = await roleRepository.GetByNameAsync("Guest")
+                        ?? throw new ApplicationException("Default role 'Guest' not found");
+        var roles = new List<RoleEntity> { guestRole };
+        foreach (var roleId in userDto.RoleIds)
+        {
+            var role = await roleRepository.GetByIdAsync(roleId);
+            if (role == null)
             {
-                throw new ApplicationException("User not found");
+                throw new ApplicationException($"Role with ID '{roleId}' not found");
             }
-
-            return MapToDto(user);
+            roles.Add(role);
         }
 
-        public async Task<List<UserDto>> GetAllUsersAsync()
-        {
-            var users = await _userRepository.GetAllAsync();
-            return users.Select(MapToDto).ToList();
-        }
+        var user = UserEntity.Create(
+            userDto.PhoneNumber,
+            userDto.Email,
+            passwordHasher.HashPassword(userDto.Password),
+            roles);
 
-        public async Task<UserDto> CreateUserAsync(CreateUserDto userDto)
-        {
-            if (await _userRepository.ExistsByEmailAsync(userDto.Email))
-            {
-                throw new ApplicationException("User with this email already exists");
-            }
-
-            var user = User.Create(
-                userDto.PhoneNumber,
-                userDto.Email,
-                HashPassword(userDto.Password)
-            );
-
-            foreach (var roleName in userDto.Roles)
-            {
-                var role = await _roleRepository.GetByNameAsync(roleName);
-                if (role == null)
-                {
-                    throw new ApplicationException($"Role '{roleName}' not found");
-                }
-
-                user.AddRole(role);
-            }
-
-            await _userRepository.AddAsync(user);
-
-            return MapToDto(user);
-        }
-
-        public Task<UserDto> UpdateUserAsync(UserDto userDto)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task DeleteUserAsync(Guid id)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static UserDto MapToDto(User user)
-        {
-            return new UserDto
-            {
-                Id = user.Id,
-                PhoneNumber = user.PhoneNumber,
-                Email = user.Email,
-                Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList()
-            };
-        }
-
-        private static string HashPassword(string password)
-            => BCrypt.Net.BCrypt.HashPassword(password);
+        await userRepository.AddAsync(user);
+        return user.Adapt<UserDto>();
     }
 }

@@ -1,10 +1,9 @@
-﻿namespace RoomRentalSystem.Application.DTOs
+﻿namespace RoomRentalSystem.Application.DTOs;
+
+public record UserDto
 {
-    public class UserDto
-    {
-        public Guid Id { get; set; }
-        public string PhoneNumber { get; set; }
-        public string Email { get; set; }
-        public List<string> Roles { get; set; } = new List<string>();
-    }
+    public Guid Id { get; set; }
+    public string PhoneNumber { get; set; }
+    public string Email { get; set; }
+    public IEnumerable<RoleDto> Roles { get; set; } =[];
 }

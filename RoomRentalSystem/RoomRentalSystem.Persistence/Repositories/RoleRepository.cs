@@ -1,17 +1,22 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RoomRentalSystem.Domain.Entities;
-using RoomRentalSystem.Persistence.Data;
+using RoomRentalSystem.Domain.IRepositories;
 using RoomRentalSystem.Persistence.Exceptions;
 
-namespace RoomRentalSystem.Persistence.Repositories
+namespace RoomRentalSystem.Persistence.Repositories;
+
+public class RoleRepository(RoomRentalSystemDbContext context) : BaseRepository<RoleEntity>(context), IRoleRepository
 {
-    public class RoleRepository(AppDbContext context) : Repository<Role>(context), IRoleRepository
+    public async Task<RoleEntity> GetByNameAsync(string name)
     {
-        public async Task<Role> GetByNameAsync(string name)
-        {
-            return await _appDbContext.Set<Role>()
-                       .FirstOrDefaultAsync(r => r.Name == name)
-                   ?? throw new PersistenceException($"Role '{name}' not found");
-        }
+        return await context.Set<RoleEntity>()
+                   .FirstOrDefaultAsync(r => r.Name == name)
+               ?? throw new PersistenceException($"Role with name '{name}' not found");
+    }
+
+    public async Task<bool> ExistsByNameAsync(string name)
+    {
+        return await context.Set<RoleEntity>()
+            .AnyAsync(r => r.Name == name);
     }
 }
